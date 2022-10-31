@@ -34,12 +34,15 @@ bool mouse_states[8];
 // Other parameters
 bool draw_wireframe = false;
 
+
 /*=================================================================================================
 	SHADERS & TRANSFORMATIONS
 =================================================================================================*/
 
 ShaderProgram PassthroughShader;
 ShaderProgram PerspectiveShader;
+ShaderProgram PerspectivelightShader;
+
 
 glm::mat4 PerspProjectionMatrix( 1.0f );
 glm::mat4 PerspViewMatrix( 1.0f );
@@ -58,12 +61,13 @@ GLuint axis_VBO[2]; //changed from 2
 float R = 1.0, r = 0.5; //Use to generate x, y, and z points from TORUS func
 int n = 5; //Use to generate x, y, and z points from TORUS func
 GLuint torus_VAO; // for TORUS object
-GLuint torus_VBO[4]; // for TORUS object; CHANGE VBO FROM 2 TO 4
-bool flag;
+GLuint torus_VBO[3]; // for TORUS object; CHANGE VBO FROM 2 TO 4
+bool flag = false; //Used to go from flat to smooth
 
-
-//GLuint normal_VAO; //For Flat-Shading -----xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-//GLuint normal_VBO[2];
+GLuint normal_VAO; //For Flat-Shading -----xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GLuint normal_VBO[2];
+float* flat_vecs;
+float* smooth_vecs;
 
 float axis_vertices[] = {
 	//x axis
@@ -87,6 +91,12 @@ float axis_colors[] = {
 	//z axis
 	0.0f, 0.0f, 1.0f, 1.0f,
 	0.0f, 0.0f, 1.0f, 1.0f
+};
+
+float vec_colors[] = {
+	1.0f,0.0f,0.0f,1.0f,
+	1.0f,0.0f,0.0f,1.0f,
+	
 };
 
 //--------xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-------- +
@@ -145,55 +155,55 @@ float* torus_Vertex(float outR,float inr, int n)
 }
 
 //ADDED THESE FUNCTIONS FOR THE SHADING
-float* flat_Shading(int no)
-{
-	std::vector<float> temp;
-	int count = 0;
-	
-	for (float i = 0; i < no; ++i) {
-		for (float j = 0; j < no; ++j) {
-			//First Triangle coordinates: x1, y1, z1, 1; x2, y2, z2, 1; x3, y3, z3, 1;
-			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
-			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
-			temp.push_back(sin(prmtr(j + .5, no)));
-			temp.push_back(1);
-
-			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
-			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
-			temp.push_back(sin(prmtr(j + .5, no)));
-			temp.push_back(1);
-
-			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
-			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no))); //----
-			temp.push_back(sin(prmtr(j + .5, no)));
-			temp.push_back(1);
-
-			//Second Triangle
-			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
-			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
-			temp.push_back(sin(prmtr(j + .5, no)));
-			temp.push_back(1);
-
-			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
-			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
-			temp.push_back(sin(prmtr(j + .5, no)));
-			temp.push_back(1);
-
-			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
-			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
-			temp.push_back(sin(prmtr(j + .5, no)));
-			temp.push_back(1);
-
-			count += 24;
-		}
-	}
-	float* sample = new float[count];
-	for (int i = 0; i < count; i++) {
-		sample[i] = temp[i];
-	}
-	return sample;
-}
-
+//float* flat_Shading(int no)
+//{
+//	std::vector<float> temp;
+//	int count = 0;
+//	
+//	for (float i = 0; i < no; ++i) {
+//		for (float j = 0; j < no; ++j) {
+//			//First Triangle coordinates: x1, y1, z1, 1; x2, y2, z2, 1; x3, y3, z3, 1;
+//			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
+//			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
+//			temp.push_back(sin(prmtr(j + .5, no)));
+//			temp.push_back(1);
+//
+//			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
+//			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
+//			temp.push_back(sin(prmtr(j + .5, no)));
+//			temp.push_back(1);
+//
+//			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
+//			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no))); //----
+//			temp.push_back(sin(prmtr(j + .5, no)));
+//			temp.push_back(1);
+//
+//			//Second Triangle
+//			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
+//			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
+//			temp.push_back(sin(prmtr(j + .5, no)));
+//			temp.push_back(1);
+//
+//			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
+//			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
+//			temp.push_back(sin(prmtr(j + .5, no)));
+//			temp.push_back(1);
+//
+//			temp.push_back((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no)));
+//			temp.push_back((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no)));
+//			temp.push_back(sin(prmtr(j + .5, no)));
+//			temp.push_back(1);
+//
+//			count += 24;
+//		}
+//	}
+//	float* sample = new float[count];
+//	for (int i = 0; i < count; i++) {
+//		sample[i] = temp[i];
+//	}
+//	return sample;
+//}
+//
 float* smooth_Shading(int n)
 {
 	std::vector<float> temp;
@@ -243,107 +253,234 @@ float* smooth_Shading(int n)
 	return sample;
 }
 
-glm::vec3 calculateVector(glm::vec3  p1, glm::vec3 p2) {
-	glm::vec3 temp;
-	temp[0] = p2[0] - p1[0];
-	temp[1] = p2[1] - p1[1];
-	temp[2] = p2[2] - p1[2];
-	return temp;
-}
-
 float* flat_Normals(float outR, float inr, int no)
 {
 	std::vector<float> temp;
+	std::vector<float> v;
+	//flat_vecs = &v[0];
 	int count = 0;
+
 
 	for (float i = 0; i < no; ++i) {
 		for (float j = 0; j < no; ++j) {
 			//First Triangle coordinates: x1, y1, z1, 1; x2, y2, z2, 1; x3, y3, z3, 1;
-			glm:: vec3 a((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i, n)),
-				(outR + inr * cos(prmtr(j, n)))* sin(prmtr(i, n)), //took away .5 from the points
-				inr* sin(prmtr(j, n)));
-			//std::cout << a[0] << ", " << a[1] << ", " << a[2] << std::endl;
+			glm::vec3 a((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i, n)),
+				(outR + inr * cos(prmtr(j, n))) * sin(prmtr(i, n)), //
+				inr * sin(prmtr(j, n)));
+			
+			glm::vec3 b((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i + 1, n)), //
+				(outR + inr * cos(prmtr(j, n))) * sin(prmtr(i + 1, n)),
+				inr * sin(prmtr(j, n)));
 
-			glm::vec3 b(((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i + 1, n))), //took away from j
-				((outR + inr * cos(prmtr(j, n))) * sin(prmtr(i + 1, n))),
-				(inr * sin(prmtr(j, n))));
-			//std::cout << b[0] << ", " << b[1] << ", " << b[2] << std::endl;	
+			glm::vec3 c((outR + inr * cos(prmtr(j + 1, n))) * cos(prmtr(i, n)),
+				(outR + inr * cos(prmtr(j + 1, n))) * sin(prmtr(i, n)),
+				inr * sin(prmtr(j + 1, n)));
+			//SECOND TRIANGLE 
+			glm::vec3 d((outR + inr * cos(prmtr(j + 1, n))) * cos(prmtr(i + 1, n)),
+				(outR + inr * cos(prmtr(j + 1, n))) * sin(prmtr(i + 1, n)),
+				inr * sin(prmtr(j + 1, n)));
 
-			glm::vec3 c( ((outR + inr * cos(prmtr(j + 1, n))) * cos(prmtr(i, n))),
-				((outR + inr * cos(prmtr(j + 1, n))) * sin(prmtr(i, n))),
-				(inr * sin(prmtr(j + 1, n))) );
-			//std::cout << c[0] << ", " << c[1] << ", " << c[2] << std::endl;
+			glm::vec3 e((outR + inr * cos(prmtr(j + 1, n))) * cos(prmtr(i, n)),
+				(outR + inr * cos(prmtr(j + 1, n))) * sin(prmtr(i, n)),
+				inr * sin(prmtr(j + 1, n)));
 
-			//Second Triangle
-			glm::vec3 d(((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no))),
-				((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no))),
-				(sin(prmtr(j + .5, no))));
-			//std::cout << d[0] << ", " << d[1] << ", " << d[2] << std::endl;
+			glm::vec3 f((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i + 1, n)),
+				(outR + inr * cos(prmtr(j, n))) * sin(prmtr(i + 1, n)),
+				inr * sin(prmtr(j, n)));
 
-			glm::vec3 e(((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no))),
-				((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no))),
-				(sin(prmtr(j + .5, no))));
-			//std::cout << e[0] << ", " << e[1] << ", " << e[2] << std::endl;
-
-			glm::vec3 f(((cos(prmtr(j + .5, no))) * cos(prmtr(i + .5, no))),
-				((cos(prmtr(j + .5, no))) * sin(prmtr(i + .5, no))),
-				(sin(prmtr(j + .5, no))));
-			//std::cout << f[0] << ", " << f[1] << ", " << f[2] << std::endl;
-
-			//count += 24;
 			glm::vec3 BA = (a - b);
 			glm::vec3 BC = (c - b);
 			glm::vec3 ED = (d - e);;
 			glm::vec3 EF = (f - e);;
-			
-			/*std::cout << "-----\n";
-			std::cout << BA[0] << " BA[0]" << std::endl;
-			std::cout << BA[1] << " BA[1]" << std::endl;
-			std::cout << BA[2] << " BA[2]" << std::endl;
-			std::cout << "-----\n";
-			std::cout << BC[0] << " BC[0]" << std::endl;
-			std::cout << BC[1] << " BC[1]" << std::endl;
-			std::cout << BC[2] << " BC[2]" << std::endl;
-			std::cout << "-----\n";*/
-			
+
 			BA = glm::normalize(BA);
 			BC = glm::normalize(BC);
 			ED = glm::normalize(ED);
 			EF = glm::normalize(EF);
-			/*std::cout << "normalized  -----\n";
-			std::cout << BA[0] << " BA[0]" << std::endl;
-			std::cout << BA[1] << " BA[1]" << std::endl;
-			std::cout << BA[2] << " BA[2]" << std::endl;
-			std::cout << "-----\n";
-			std::cout << BC[0] << " BC[0]" << std::endl;
-			std::cout << BC[1] << " BC[1]" << std::endl;
-			std::cout << BC[2] << " BC[2]" << std::endl;
-			std::cout << "-----\n";*/
+
 			glm::vec3 ASD = glm::cross(BA, BC);
 			glm::vec3 FDS = glm::cross(ED, EF);
-			
-			//std::cout << "ASD: " << ASD[0] << ", " << ASD[1] << ", " << ASD[2] << std::endl;
-			glm::vec4 norm1 = glm::vec4(ASD, 1.0);
-			//std::cout << "nomr1: " << norm1[0] << ", " << norm1[1] << ", " << norm1[2] << " " << norm1[3] << std::endl << std::endl;
-			glm::vec4 norm2 = glm::vec4(FDS, 1.0);
 
-			//norm1[0] = ASD[0]; norm1[1] = ASD[1]; norm1[2] = ASD[2]; norm1[3] = 1.0;
-			//norm2[0] = FDS[0]; norm2[1] = FDS[1]; norm2[2] = FDS[2]; norm2[3] = 1.0;
-			temp.push_back(norm1[0]);
-			temp.push_back(norm1[1]);
-			temp.push_back(norm1[2]);
-			temp.push_back(norm1[3]);
-			temp.push_back(norm2[0]);
-			temp.push_back(norm2[1]);
-			temp.push_back(norm2[2]);
-			temp.push_back(norm2[3]);
-			count += 8;
+			glm::vec4 norm1 = glm::vec4(ASD, 1.0);
+			glm::vec4 norm2 = glm::vec4(FDS, 1.0);
+			//Norm for Triangle 1
+			temp.push_back(-1 * norm1[0]); temp.push_back(-1 * norm1[1]); temp.push_back(-1 * norm1[2]); temp.push_back(-1 * norm1[3]);
+			temp.push_back(-1 * norm1[0]); temp.push_back(-1 * norm1[1]); temp.push_back(-1 * norm1[2]); temp.push_back(-1 * norm1[3]);
+			temp.push_back(-1 * norm1[0]); temp.push_back(-1 * norm1[1]); temp.push_back(-1 * norm1[2]); temp.push_back(-1 * norm1[3]);
+			//Norm for Triangle 2
+			temp.push_back(-1 * norm2[0]); temp.push_back(-1 * norm2[1]); temp.push_back(-1 * norm2[2]); temp.push_back(-1 * norm2[3]);
+			temp.push_back(-1 * norm2[0]); temp.push_back(-1 * norm2[1]); temp.push_back(-1 * norm2[2]); temp.push_back(-1 * norm2[3]);
+			temp.push_back(-1 * norm2[0]); temp.push_back(-1 * norm2[1]); temp.push_back(-1 * norm2[2]); temp.push_back(-1 * norm2[3]);
+			//for v vector
+			v.push_back((a[0] + b[0] + c[0]) / 3); v.push_back((a[1] + b[1] + c[1]) / 3); v.push_back((a[2] + b[2] + c[2]) / 3); v.push_back(1);
+			v.push_back(-1 * norm1[0]); v.push_back(-1 * norm1[1]); v.push_back(-1 * norm1[2]); v.push_back(-1 * norm1[3]);
+			v.push_back((d[0] + e[0] + f[0]) / 3); v.push_back((d[1] + e[1] + f[1]) / 3); v.push_back((d[2] + e[2] + f[2]) / 3); v.push_back(1);
+			v.push_back(-1 * norm2[0]); v.push_back(-1 * norm2[1]); v.push_back(-1 * norm2[2]); v.push_back(-1 * norm2[3]);
+
+			count += 24;
+			
 		}
 	}
+
+	
 	float* sample = new float[count];
 	for (int i = 0; i < count; i++) {
-		sample[i] = temp[i];
+		sample[i] = 1*temp[i];
 	}
+
+	return sample;
+}
+
+float* returnNormalValues(float outR, float inr, int no)
+{
+	std::vector<float> v;
+	int countNorms = 0;
+
+	for (float i = 0; i < no; ++i) {
+		for (float j = 0; j < no; ++j) {
+			//First Triangle coordinates: x1, y1, z1, 1; x2, y2, z2, 1; x3, y3, z3, 1;
+			glm::vec3 a((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i, n)),
+				(outR + inr * cos(prmtr(j, n))) * sin(prmtr(i, n)), //
+				inr * sin(prmtr(j, n)));
+
+			glm::vec3 b((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i + 1, n)), //
+				(outR + inr * cos(prmtr(j, n))) * sin(prmtr(i + 1, n)),
+				inr * sin(prmtr(j, n)));
+
+			glm::vec3 c((outR + inr * cos(prmtr(j + 1, n))) * cos(prmtr(i, n)),
+				(outR + inr * cos(prmtr(j + 1, n))) * sin(prmtr(i, n)),
+				inr * sin(prmtr(j + 1, n)));
+			//SECOND TRIANGLE 
+			glm::vec3 d((outR + inr * cos(prmtr(j + 1, n))) * cos(prmtr(i + 1, n)),
+				(outR + inr * cos(prmtr(j + 1, n))) * sin(prmtr(i + 1, n)),
+				inr * sin(prmtr(j + 1, n)));
+
+			glm::vec3 e((outR + inr * cos(prmtr(j + 1, n))) * cos(prmtr(i, n)),
+				(outR + inr * cos(prmtr(j + 1, n))) * sin(prmtr(i, n)),
+				inr * sin(prmtr(j + 1, n)));
+
+			glm::vec3 f((outR + inr * cos(prmtr(j, n))) * cos(prmtr(i + 1, n)),
+				(outR + inr * cos(prmtr(j, n))) * sin(prmtr(i + 1, n)),
+				inr * sin(prmtr(j, n)));
+
+			glm::vec3 BA = (a - b);
+			glm::vec3 BC = (c - b);
+			glm::vec3 ED = (d - e);
+			glm::vec3 EF = (f - e);
+
+			glm::vec3 ASD = glm::cross(BA, BC);
+			glm::vec3 FDS = glm::cross(ED, EF);
+
+			ASD = glm::normalize(ASD);
+			FDS = glm::normalize(FDS);
+
+			glm::vec4 norm1 = glm::vec4(ASD, 1.0);
+			glm::vec4 norm2 = glm::vec4(FDS, 1.0);
+
+			//for v vector
+			glm::vec3 midpoint1((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3);
+			glm::vec3 midpoint2((d[0] + e[0] + f[0]) / 3, (d[1] + e[1] + f[1]) / 3, (d[2] + e[2] + f[2]) / 3);
+
+			midpoint1 = midpoint1 - ASD;
+			midpoint2 = midpoint2 - FDS;
+			
+			norm1[0] += midpoint1[0]; norm1[1] += midpoint1[1]; norm1[2] += midpoint1[2];
+			norm2[0] += midpoint2[0]; norm2[1] += midpoint2[1]; norm2[2] += midpoint2[2];
+			
+			v.push_back(midpoint1[0]); v.push_back(midpoint1[1]); v.push_back(midpoint1[2]); v.push_back(1);
+			v.push_back(norm1[0]); v.push_back(norm1[1]); v.push_back(norm1[2]); v.push_back(norm1[3]);
+			v.push_back(midpoint2[0]); v.push_back(midpoint2[1]); v.push_back(midpoint2[2]); v.push_back(1);
+			v.push_back(norm2[0]); v.push_back(norm2[1]); v.push_back(norm2[2]); v.push_back(norm2[3]);
+			
+			countNorms += 16;
+		}
+	}
+	float* sample = new float[countNorms];
+	for (int i = 0; i < countNorms; i++) {
+		sample[i] = 1 * v[i];
+	}
+
+	return sample;
+}
+
+float* returnSmoothValues(float R, float r, int n) {
+	int countNorms = 0;
+	std::vector<float> v;
+
+	for (float i = 0; i < n; ++i) {
+		for (float j = 0; j < n; ++j) {
+			//First Triangle coordinates: x1, y1, z1, 1; x2, y2, z2, 1; x3, y3, z3, 1;
+			glm::vec3 a((R + r * cos(prmtr(j, n))) * cos(prmtr(i, n)),
+				(R + r * cos(prmtr(j, n))) * sin(prmtr(i, n)), //
+				r * sin(prmtr(j, n)));
+
+			glm::vec3 b((R + r * cos(prmtr(j, n))) * cos(prmtr(i + 1, n)), //
+				(R + r * cos(prmtr(j, n))) * sin(prmtr(i + 1, n)),
+				r * sin(prmtr(j, n)));
+
+			glm::vec3 c((R + r * cos(prmtr(j + 1, n))) * cos(prmtr(i, n)),
+				(R + r * cos(prmtr(j + 1, n))) * sin(prmtr(i, n)),
+				r * sin(prmtr(j + 1, n)));
+
+			//SECOND TRIANGLE 
+			glm::vec3 d((R + r * cos(prmtr(j + 1, n))) * cos(prmtr(i + 1, n)),
+				(R + r * cos(prmtr(j + 1, n))) * sin(prmtr(i + 1, n)),
+				r * sin(prmtr(j + 1, n)));
+
+			glm::vec3 e((R + r * cos(prmtr(j + 1, n))) * cos(prmtr(i, n)),
+				(R + r * cos(prmtr(j + 1, n))) * sin(prmtr(i, n)),
+				r * sin(prmtr(j + 1, n)));
+
+			glm::vec3 f((R + r * cos(prmtr(j, n))) * cos(prmtr(i + 1, n)),
+				(R + r * cos(prmtr(j, n))) * sin(prmtr(i + 1, n)),
+				r * sin(prmtr(j, n)));
+
+			glm::vec3 mid(R + r * (cos(prmtr(j, n))),
+				-r,
+				r * (sin(j) - 1));
+
+			a = glm::normalize(a);
+			b = glm::normalize(b);
+			c = glm::normalize(c);
+			d = glm::normalize(d);
+			e = glm::normalize(e);
+			f = glm::normalize(f);
+			a -= mid;
+			b -= mid;
+			c -= mid;
+			d -= mid;
+			e -= mid;
+			f -= mid;
+
+			glm::vec4 norm1 = glm::vec4(a, 1.0);
+			glm::vec4 norm2 = glm::vec4(b, 1.0);
+			glm::vec4 norm3 = glm::vec4(c, 1.0);
+			glm::vec4 norm4 = glm::vec4(d, 1.0);
+			glm::vec4 norm5 = glm::vec4(e, 1.0);
+			glm::vec4 norm6 = glm::vec4(f, 1.0);
+
+			//for v vector
+			//glm::vec3 midpoint1((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3);
+			//glm::vec3 midpoint2((d[0] + e[0] + f[0]) / 3, (d[1] + e[1] + f[1]) / 3, (d[2] + e[2] + f[2]) / 3);
+
+			//norm1[0] += midpoint1[0]; norm1[1] += midpoint1[1]; norm1[2] += midpoint1[2];
+			//norm2[0] += midpoint2[0]; norm2[1] += midpoint2[1]; norm2[2] += midpoint2[2];
+
+			v.push_back(norm1[0]); v.push_back(norm1[1]); v.push_back(norm1[2]); v.push_back(norm1[3]);
+			v.push_back(norm2[0]); v.push_back(norm2[1]); v.push_back(norm2[2]); v.push_back(norm2[3]);
+			v.push_back(norm3[0]); v.push_back(norm3[1]); v.push_back(norm3[2]); v.push_back(norm3[3]);
+			v.push_back(norm4[0]); v.push_back(norm4[1]); v.push_back(norm4[2]); v.push_back(norm4[3]);
+			v.push_back(norm5[0]); v.push_back(norm5[1]); v.push_back(norm5[2]); v.push_back(norm5[3]);
+			v.push_back(norm6[0]); v.push_back(norm6[1]); v.push_back(norm6[2]); v.push_back(norm6[3]);
+
+			countNorms += 24;
+		}
+	}
+	float* sample = new float[countNorms];
+	for (int i = 0; i < countNorms; i++) {
+		sample[i] = 1 * v[i];
+	}
+
 	return sample;
 }
 
@@ -392,7 +529,7 @@ void CreateShaders( void )
 	PerspectiveShader.Create( "./shaders/persp.vert", "./shaders/persp.frag" );
 
 	//perpslight.frag/vert
-	PerspectiveShader.Create("./shaders/persplight.vert", "./shaders/persplight.frag"); //---==--=-=-xxx
+	PerspectivelightShader.Create("./shaders/persplight.vert", "./shaders/persplight.frag"); //New Shader for Torus
 }
 
 /*=================================================================================================
@@ -416,10 +553,7 @@ void CreateAxisBuffers( void )
 	glVertexAttribPointer( 1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof( float ), (void*)0 );
 	glEnableVertexAttribArray( 1 );
 
-	
-
 	glBindVertexArray( 0 );
-
 	//===xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 	/*glGenVertexArrays(1, &normal_VAO);
@@ -447,7 +581,7 @@ void CreateTorusBuffers(void)
 	glGenVertexArrays(1, &torus_VAO);
 	glBindVertexArray(torus_VAO);
 
-	glGenBuffers(4, &torus_VBO[0]);
+	glGenBuffers(3, &torus_VBO[0]);
 
 	float* torus = torus_Vertex(R, r, n);
 
@@ -460,64 +594,71 @@ void CreateTorusBuffers(void)
 	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), torus, GL_STATIC_DRAW); 
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
-	// ADDED THIS FOR FLAT SHADING XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-	float* normals;
-	if (flag == false) {
-		normals = flat_Shading(n);
-	}
-	else
-		normals = smooth_Shading(n);
 
+	// ADDED THIS FOR FLAT SHADING XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+	float* norms;
+	if (flag == false)
+		norms = flat_Normals(R, r, n);
+	else
+		norms = smooth_Shading( n);
+	
 	glBindBuffer(GL_ARRAY_BUFFER, torus_VBO[2]);
-	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normals, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), norms, GL_STATIC_DRAW);
 	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(2);
-
-	glBindBuffer(GL_ARRAY_BUFFER, torus_VBO[3]);
-	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normals, GL_STATIC_DRAW);
-	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(3);
-
-	/*
-	float* norms = flat_Normals(R, r, n);
-
-	glBindBuffer(GL_ARRAY_BUFFER, torus_VBO[4]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(norms), norms, GL_STATIC_DRAW);
-	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(4);
-
-	glBindBuffer(GL_ARRAY_BUFFER, torus_VBO[5]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(norms), norms, GL_STATIC_DRAW);
-	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(5);*/
+	
 
 	glBindVertexArray(0);
 	delete[] torus; //ADDED DELETES TO CLEAR MEMORY
-	delete[] normals;
-	//delete[] norms;
+	delete[] norms;
 }
 
-/*void CreateNormalVecs(void)
-{
+void CreateNormalVecs(void)
+{/*
+	glGenVertexArrays(1, &normal_VAO);
+	glBindVertexArray(normal_VAO);
+
+	glGenBuffers(2, &normal_VBO[0]);
+	
+	float* normValues = returnNormalValues(R,r,n);
+
+	glBindBuffer(GL_ARRAY_BUFFER, normal_VBO[0]);
+	glBufferData(GL_ARRAY_BUFFER, n * n * 16 * sizeof(float), normValues, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, normal_VBO[1]); //Needs to be for color of object
+	glBufferData(GL_ARRAY_BUFFER,n*n*16*sizeof(float), normValues, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+	delete[] normValues;*/
+}
+
+void CreateSmoothVecs(void) {
+
 	glGenVertexArrays(1, &normal_VAO);
 	glBindVertexArray(normal_VAO);
 
 	glGenBuffers(2, &normal_VBO[0]);
 
-	float* normals = normal_Vecs(n);
+	float* normValues = returnSmoothValues(R, r, n);
 
 	glBindBuffer(GL_ARRAY_BUFFER, normal_VBO[0]);
-	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normals, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normValues, GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
-	glBindBuffer(GL_ARRAY_BUFFER, normal_VBO[1]);
-	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normals, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, normal_VBO[1]); //Needs to be for color of object
+	glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normValues, GL_STATIC_DRAW);
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
-}*/
+	delete[] normValues;
+}
 
 /*=================================================================================================
 	CALLBACKS
@@ -564,6 +705,7 @@ void keyboard_func( unsigned char key, int x, int y )
 			if (n < 75)
 				n++;
 			CreateTorusBuffers();
+			CreateNormalVecs();
 			glutPostRedisplay();
 			break;
 		}
@@ -572,6 +714,7 @@ void keyboard_func( unsigned char key, int x, int y )
 			if (n > 3) {
 				n--;
 				CreateTorusBuffers();
+				CreateNormalVecs();
 				glutPostRedisplay();
 			}
 			break;
@@ -581,6 +724,7 @@ void keyboard_func( unsigned char key, int x, int y )
 			if (r <= 1.5)
 				r = r + 0.01;
 			CreateTorusBuffers();
+			CreateNormalVecs();
 			glutPostRedisplay();
 			break;
 		}
@@ -589,6 +733,7 @@ void keyboard_func( unsigned char key, int x, int y )
 			if (r > 0.1) 
 				r = r - 0.01;
 			CreateTorusBuffers();
+			CreateNormalVecs();
 			glutPostRedisplay();
 			break;
 		}
@@ -596,16 +741,18 @@ void keyboard_func( unsigned char key, int x, int y )
 		{
 			if (R <= 5)
 				R = R + 0.01;
-			glutPostRedisplay();
 			CreateTorusBuffers();
+			CreateNormalVecs();
+			glutPostRedisplay();
 			break;
 		}
 		case'd':
 		{
 			if (R > 0.5)
 				R = R - 0.01;
-			glutPostRedisplay();
 			CreateTorusBuffers();
+			CreateNormalVecs();
+			glutPostRedisplay();
 			break;
 		}
 		case'z':
@@ -730,14 +877,20 @@ void display_func( void )
 	glDrawArrays( GL_LINES, 0, 6 );
 
 	glBindVertexArray( 0 );
+
 	//--------------------------------------------------------+
+	PerspectivelightShader.Use();
+	PerspectivelightShader.SetUniform("projectionMatrix", glm::value_ptr(PerspProjectionMatrix), 4, GL_FALSE, 1);
+	PerspectivelightShader.SetUniform("viewMatrix", glm::value_ptr(PerspViewMatrix), 4, GL_FALSE, 1);
+	PerspectivelightShader.SetUniform("modelMatrix", glm::value_ptr(PerspModelMatrix), 4, GL_FALSE, 1);
+
 	glBindVertexArray( torus_VAO ); //Added for TORUS
 	glDrawArrays(GL_TRIANGLES, 0, n * n * 6); //Added for TORUS
 	glBindVertexArray(0);
 	//--------------------------------------------------------+
-	//glBindVertexArray(normal_VAO);
-	//glDrawArrays(GL_TRIANGLES, 0, n * n * 6);
-	//glBindVertexArray(0);
+	glBindVertexArray(normal_VAO);
+	glDrawArrays(GL_LINES, 0, n * n * 24);
+	glBindVertexArray(0);
 
 	if( draw_wireframe == true )
 		glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -768,7 +921,8 @@ void init( void )
 	// Create buffers
 	CreateAxisBuffers();
 	CreateTorusBuffers(); //From the torus buffers
-	//CreateNormalVecs();
+	CreateNormalVecs();
+	CreateSmoothVecs();
 
 	std::cout << "Finished initializing...\n\n";
 }
@@ -812,3 +966,33 @@ int main( int argc, char** argv )
 
 	return EXIT_SUCCESS;
 }
+
+
+
+
+
+
+/*float* normals;
+if (flag == false) {
+	normals = flat_Shading(n);
+}
+else
+normals = smooth_Shading(n);
+
+glBindBuffer(GL_ARRAY_BUFFER, torus_VBO[2]);
+glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normals, GL_STATIC_DRAW);
+glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+glEnableVertexAttribArray(2);
+
+glBindBuffer(GL_ARRAY_BUFFER, torus_VBO[3]);
+glBufferData(GL_ARRAY_BUFFER, n * n * 24 * sizeof(float), normals, GL_STATIC_DRAW);
+glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+glEnableVertexAttribArray(3);*/
+
+/*
+for flat shading, make sure to calculate and push 6 points so the the shading works on all the triangles. the 
+way i calculated as of now, only some of the triangles are shaded so it looks weird
+
+for the vectors, push two points, but might have to create a new buffer for them since they are a different size than 
+the arays/points used in the torus_buffer
+*/
